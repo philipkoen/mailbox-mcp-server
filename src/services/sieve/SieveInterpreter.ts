@@ -73,6 +73,8 @@ export interface SieveTraceEntry {
   command: "if" | "elsif" | "else";
   result: boolean;
   rule?: string;
+  /** True if the block of this condition produced an action or a stop */
+  effective: boolean;
 }
 
 export interface SieveDryRunResult {
@@ -434,10 +436,9 @@ class RunState {
         case "if": {
           const ruleBefore = this.currentRule;
           const result = this.evalTop(cmd);
-          this.trace(cmd, "if", result);
           chainDone = result;
-          if (result && cmd.block) {
-            this.execBlock(cmd.block);
+          if (result) {
+            this.runMatchedBlock(this.trace(cmd, "if"), cmd.block);
           }
           this.currentRule = ruleBefore;
           break;
@@ -447,20 +448,16 @@ class RunState {
             break;
           }
           const result = this.evalTop(cmd);
-          this.trace(cmd, "elsif", result);
           chainDone = result;
-          if (result && cmd.block) {
-            this.execBlock(cmd.block);
+          if (result) {
+            this.runMatchedBlock(this.trace(cmd, "elsif"), cmd.block);
           }
           break;
         }
         case "else": {
           if (!chainDone) {
-            this.trace(cmd, "else", true);
             chainDone = true;
-            if (cmd.block) {
-              this.execBlock(cmd.block);
-            }
+            this.runMatchedBlock(this.trace(cmd, "else"), cmd.block);
           }
           break;
         }
@@ -468,6 +465,18 @@ class RunState {
           chainDone = true;
           this.execCommand(cmd);
       }
+    }
+  }
+
+  /** Run a matched block and mark the trace entry as effective if it acted */
+  private runMatchedBlock(entry: SieveTraceEntry, block?: SieveCommand[]) {
+    const before = this.actions.length;
+    try {
+      if (block) {
+        this.execBlock(block);
+      }
+    } finally {
+      entry.effective = this.actions.length > before || this.stopped;
     }
   }
 
@@ -491,16 +500,16 @@ class RunState {
   private trace(
     cmd: SieveCommand,
     command: SieveTraceEntry["command"],
-    result: boolean,
-  ) {
-    if (result) {
-      this.matched.push({
-        line: cmd.line,
-        command,
-        result,
-        ...(this.currentRule ? { rule: this.currentRule } : {}),
-      });
-    }
+  ): SieveTraceEntry {
+    const entry: SieveTraceEntry = {
+      line: cmd.line,
+      command,
+      result: true,
+      effective: false,
+      ...(this.currentRule ? { rule: this.currentRule } : {}),
+    };
+    this.matched.push(entry);
+    return entry;
   }
 
   private addAction(action: Omit<SieveAction, "rule">) {

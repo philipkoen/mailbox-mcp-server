@@ -187,7 +187,7 @@ describe("analysis tools", () => {
     );
     const text = result.content[0].text as string;
     expect(text).toContain(
-      "2 message(s) tested, 1 with at least one matching rule",
+      "2 message(s) tested, 1 where a rule acted",
     );
     expect(text).toContain("INBOX/Recruiter-Spam: 1");
     expect(text).toContain("Spam: 1");

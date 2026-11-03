@@ -247,3 +247,65 @@ if header :count "ge" :comparator "i;ascii-numeric" "to" "1" { fileinto "HasTo";
     ]);
   });
 });
+
+describe("rule labels", () => {
+  it("joins consecutive comment lines and keeps the first line first", () => {
+    const ast = parseSieve(`# === Block v5 ===
+# second line
+# third line
+if true { keep; }
+
+# unrelated
+
+# (c) own label
+if false { keep; }`);
+    expect(ast[0].comment).toBe("=== Block v5 === second line third line");
+    expect(ast[1].comment).toBe("(c) own label");
+  });
+
+  it("strips leading hashes of OX '## Flag' comments", () => {
+    const ast = parseSieve(`## Flag: |UniqueId:20|Rulename: City
+if true { keep; }`);
+    expect(ast[0].comment).toBe("Flag: |UniqueId:20|Rulename: City");
+  });
+});
+
+describe("effective rules vs. helper conditions", () => {
+  const script = `require ["fileinto", "variables", "regex", "body", "copy"];
+# === Recruiter block ===
+if not address :domain :is "from" ["partner.example"] {
+  set "hit" "";
+  # (a) domain
+  if address :domain :regex "from" "jobvermittl" { set "hit" "a"; }
+  # (b) text
+  if body :text :regex "zzz-never" { set "hit" "b"; }
+  if not string :is "\${hit}" "" {
+    fileinto :copy "Spam";
+    fileinto "INBOX/Recruiter-Spam";
+    stop;
+  }
+}`;
+
+  it("marks the acting rule effective and helpers as plain conditions", () => {
+    const result = dryRunSieve(script, recruiterMail);
+    expect(result.deliveredTo).toEqual(["Spam", "INBOX/Recruiter-Spam"]);
+    const effective = result.matched.filter(m => m.effective);
+    const helpers = result.matched.filter(m => !m.effective);
+    expect(effective.map(m => m.rule)).toEqual([
+      "=== Recruiter block ===",
+      "=== Recruiter block ===",
+    ]);
+    expect(helpers.map(m => m.rule)).toEqual(["(a) domain"]);
+  });
+
+  it("does not treat a partner-exclusion wrapper as a hit", () => {
+    const normal = message(
+      "From: Amt <x@stadt-beispiel.example>\r\nSubject: Termin",
+      "Hallo",
+    );
+    const result = dryRunSieve(script, normal);
+    expect(result.deliveredTo).toEqual(["INBOX"]);
+    expect(result.actions).toEqual([]);
+    expect(result.matched.every(m => !m.effective)).toBe(true);
+  });
+});

@@ -65,6 +65,7 @@ export function tokenize(source: string): Token[] {
   let i = 0;
   let line = 1;
   let pendingComment: string | undefined;
+  let lastCommentLine = -1;
   const len = source.length;
 
   const push = (token: Omit<Token, "comment">) => {
@@ -88,9 +89,18 @@ export function tokenize(source: string): Token[] {
     // Hash comment
     if (ch === "#") {
       const end = source.indexOf("\n", i);
-      const text = source.slice(i + 1, end === -1 ? len : end).trim();
+      const text = source
+        .slice(i + 1, end === -1 ? len : end)
+        .replace(/^#+/, "")
+        .trim();
       if (text) {
-        pendingComment = text;
+        // Consecutive comment lines form one block; keep them together so the
+        // first (most descriptive) line leads the rule label.
+        pendingComment =
+          pendingComment && lastCommentLine === line - 1
+            ? `${pendingComment} ${text}`
+            : text;
+        lastCommentLine = line;
       }
       i = end === -1 ? len : end;
       continue;

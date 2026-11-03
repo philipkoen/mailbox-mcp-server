@@ -146,7 +146,7 @@ export function createAnalysisTools(): Tool[] {
           onlyMatching: {
             type: "boolean",
             description:
-              "Only list messages where at least one rule matched (default false)",
+              "Only list messages where a rule acted, i.e. anything besides implicit keep (default false)",
             default: false,
           },
           expectFolder: {
@@ -207,13 +207,28 @@ function describeResult(result: SieveDryRunResult): string {
   return parts.join(" | ");
 }
 
+/** A message "matches" if the script did something besides implicit keep */
+export function hasEffect(result: SieveDryRunResult): boolean {
+  return result.actions.some(a => a.type !== "unsupported");
+}
+
 function describeRules(result: SieveDryRunResult): string {
-  if (!result.matched.length) {
-    return "no rule matched (implicit keep)";
+  const label = (m: SieveDryRunResult["matched"][number], max: number) =>
+    `line ${m.line}${m.rule ? ` [${m.rule.slice(0, max)}]` : ""}`;
+  const effective = result.matched.filter(m => m.effective);
+  const conditions = result.matched.filter(m => !m.effective);
+  const parts: string[] = [];
+  parts.push(
+    effective.length
+      ? `rules: ${effective.map(m => label(m, 80)).join("; ")}`
+      : "no rule acted (implicit keep)",
+  );
+  if (conditions.length) {
+    parts.push(
+      `true conditions: ${conditions.map(m => label(m, 45)).join("; ")}`,
+    );
   }
-  return result.matched
-    .map(m => `line ${m.line}${m.rule ? ` [${m.rule.slice(0, 90)}]` : ""}`)
-    .join("; ");
+  return parts.join("\n   ");
 }
 
 async function handleTestSieveScript(
@@ -285,7 +300,8 @@ async function handleTestSieveScript(
         (destinations.get("(discarded)") ?? 0) + 1,
       );
     }
-    if (result.matched.length) matchedCount++;
+    const effect = hasEffect(result);
+    if (effect) matchedCount++;
 
     const from = getHeaderValues(message.headers, "From")[0] ?? "";
     const subject = getHeaderValues(message.headers, "Subject")[0] ?? "";
@@ -297,14 +313,14 @@ async function handleTestSieveScript(
     ) {
       missingExpected.push(summary);
     }
-    if (!input.onlyMatching || result.matched.length) {
+    if (!input.onlyMatching || effect) {
       lines.push(summary);
     }
   }
 
   const out: string[] = [];
   out.push(
-    `🧪 Sieve dry run of ${scriptName} on ${folder}: ${tested} message(s) tested, ${matchedCount} with at least one matching rule. Nothing was changed on the server.`,
+    `🧪 Sieve dry run of ${scriptName} on ${folder}: ${tested} message(s) tested, ${matchedCount} where a rule acted. Nothing was changed on the server.`,
   );
   out.push("");
   out.push("Destinations:");
