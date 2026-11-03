@@ -399,3 +399,22 @@ describe("Security validations", () => {
     expect(result.to[0].name).toBe("TestName");
   });
 });
+
+describe("Folder path validation", () => {
+  it("should accept IMAP subfolder paths with '/' delimiter", () => {
+    const result = validateInput(getEmailSchema, {
+      uid: 1,
+      folder: "INBOX/Recruiter-Spam",
+    });
+    expect(result.folder).toBe("INBOX/Recruiter-Spam");
+  });
+
+  it.each(["/INBOX", "INBOX/", "INBOX//Sub", "INBOX/../Spam", "./INBOX"])(
+    "should reject malformed folder path %s",
+    folder => {
+      expect(() => validateInput(getEmailSchema, { uid: 1, folder })).toThrow(
+        "Validation failed",
+      );
+    },
+  );
+});
