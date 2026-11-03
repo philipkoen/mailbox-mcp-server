@@ -21,7 +21,7 @@ export interface ServerConfig {
 }
 
 // Custom validation functions for security
-const isStrongPassword = (value: string): boolean => {
+const _isStrongPassword = (value: string): boolean => {
   // Minimum 8 characters, at least one uppercase, lowercase, and number
   const minLength = value.length >= 8;
   const hasUppercase = /[A-Z]/.test(value);

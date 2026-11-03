@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AuthenticationError,
-  CacheError,
   CalendarError,
-  ConfigurationError,
   ConnectionError,
   EmailError,
   ErrorCode,
   ErrorUtils,
-  MailboxError,
-  type MCPError,
   RateLimitError,
   ValidationError,
 } from "../src/types/errors.js";

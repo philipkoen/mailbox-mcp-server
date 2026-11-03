@@ -42,14 +42,6 @@ import type {
   EmailThread,
   ImapConnection,
 } from "../types/email.types.js";
-import {
-  CacheError,
-  ConnectionError,
-  EmailError,
-  ErrorCode,
-  type ErrorContext,
-  ErrorUtils,
-} from "../types/errors.js";
 import { withCacheFallback } from "../utils/cacheFallback.js";
 import {
   ImapConnectionPool,
@@ -815,7 +807,7 @@ export class EmailService {
           await wrapper.connection.messageMove(`${uid}:${uid}`, "Trash", {
             uid: true,
           });
-        } catch (moveError) {
+        } catch (_moveError) {
           // If Trash folder doesn't exist, try other common names
           const trashFolders = ["Deleted Items", "Deleted", "INBOX.Trash"];
           let moved = false;
@@ -831,7 +823,7 @@ export class EmailService {
               );
               moved = true;
               break;
-            } catch (error) {
+            } catch (_error) {
               // Continue to next folder
             }
           }

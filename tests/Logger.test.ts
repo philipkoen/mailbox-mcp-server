@@ -1,7 +1,6 @@
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ChildLogger,
   type LogContext,
   Logger,
   type LoggerConfig,
@@ -83,7 +82,7 @@ describe("Logger", () => {
 
   describe("Log Levels (RFC 5424)", () => {
     it("should support all RFC 5424 log levels", () => {
-      const levels = [
+      const _levels = [
         LogLevel.DEBUG,
         LogLevel.INFO,
         LogLevel.NOTICE,

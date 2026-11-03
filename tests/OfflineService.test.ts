@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryCache } from "../src/services/LocalCache.js";
 import { OfflineService } from "../src/services/OfflineService.js";
 import type {

@@ -180,7 +180,7 @@ export class SieveService {
       if (this.connected && this.socket) {
         await this.sendCommand("LOGOUT");
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore logout errors
     } finally {
       if (this.socket) {
@@ -575,8 +575,7 @@ export class SieveService {
         code: "BYE",
         message: line.substring(4),
       });
-    }
-    else {
+    } else {
       // Part of a multi-line response (script names, capabilities, script body)
       this.responseLines.push(line);
     }
@@ -861,7 +860,9 @@ export class SieveService {
           this.responseLines = [];
           const postTlsTimeout = setTimeout(() => {
             this.pendingCommand = null;
-            reject(new SieveError("Timeout waiting for post-STARTTLS capabilities"));
+            reject(
+              new SieveError("Timeout waiting for post-STARTTLS capabilities"),
+            );
           }, 10000);
           this.pendingCommand = {
             resolve: () => {

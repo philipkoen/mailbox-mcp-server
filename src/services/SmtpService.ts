@@ -1,17 +1,8 @@
-import type { Transporter } from "nodemailer";
 import type {
   EmailComposition,
   EmailOperationResult,
   SmtpConnection,
 } from "../types/email.types.js";
-import {
-  ConnectionError,
-  EmailError,
-  ErrorCode,
-  type ErrorContext,
-  ErrorUtils,
-  ValidationError,
-} from "../types/errors.js";
 import { createLogger } from "./Logger.js";
 import {
   SmtpConnectionPool,

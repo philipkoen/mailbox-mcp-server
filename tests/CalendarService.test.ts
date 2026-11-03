@@ -469,7 +469,7 @@ describe("CalendarService", () => {
       ["Authentication failed", "AUTH_ERROR"],
       ["Server unavailable", "SERVER_ERROR"],
       ["Rate limit exceeded", "RATE_LIMIT"],
-    ])("should handle %s error", async (description, errorType) => {
+    ])("should handle %s error", async (_description, errorType) => {
       mockFetchCalendarObjects.mockRejectedValueOnce(new Error(errorType));
 
       const result = await calendarService.getCalendarEvents({
@@ -549,7 +549,7 @@ describe("CalendarService", () => {
       ["empty string", "", 4, null],
     ])(
       "should filter %s",
-      (scenario, query, expectedCount, expectedFirstId) => {
+      (_scenario, query, expectedCount, expectedFirstId) => {
         const results = calendarService.testFilterEventsByQuery(events, query);
         expect(results).toHaveLength(expectedCount);
         if (expectedFirstId) {

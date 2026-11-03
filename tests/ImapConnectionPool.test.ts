@@ -59,7 +59,7 @@ class MockImapFlow {
     this.selectedFolder = folder;
   }
 
-  on(event: string, handler: (...args: unknown[]) => void): MockImapFlow {
+  on(_event: string, _handler: (...args: unknown[]) => void): MockImapFlow {
     // Mock event handler registration - ensure proper chaining
     return this;
   }
@@ -406,6 +406,7 @@ describe("ImapConnectionPool", () => {
       expect(wrapper.isHealthy).toBe(true);
 
       // Validation should succeed for a working connection
+      // biome-ignore lint/complexity/useLiteralKeys: accessing a private method in tests
       const isValid = await pool["validateConnection"](wrapper.connection);
       expect(isValid).toBe(true);
 
@@ -430,7 +431,7 @@ describe("ImapConnectionPool", () => {
 
     it("should mark connection unhealthy and recreate if validation fails", async () => {
       const wrapper = await pool.acquire();
-      const connectionId = wrapper.id;
+      const _connectionId = wrapper.id;
 
       // Simulate connection becoming unhealthy
       wrapper.isHealthy = false;

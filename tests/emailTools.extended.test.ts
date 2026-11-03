@@ -11,7 +11,7 @@ describe("Email Tools - Extended Coverage", () => {
   let mockEmailService: Partial<EmailService>;
   let mockSmtpService: Partial<SmtpService>;
 
-  const mockEmail: EmailMessage = {
+  const _mockEmail: EmailMessage = {
     id: "msg-1",
     uid: 123,
     subject: "Test Subject",

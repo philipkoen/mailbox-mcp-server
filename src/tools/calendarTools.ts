@@ -28,7 +28,7 @@ export function isCalendarTool(name: string): name is CalendarToolName {
   return CALENDAR_TOOLS.includes(name as CalendarToolName);
 }
 
-export function createCalendarTools(calendarService: CalendarService): Tool[] {
+export function createCalendarTools(_calendarService: CalendarService): Tool[] {
   return [
     {
       name: "get_calendar_events",

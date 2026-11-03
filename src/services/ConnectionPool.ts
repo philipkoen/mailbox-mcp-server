@@ -462,7 +462,7 @@ export abstract class ConnectionPool<T> {
       const isValid = await this.validateConnection(wrapper.connection);
       wrapper.isHealthy = isValid;
       return !isValid;
-    } catch (error) {
+    } catch (_error) {
       wrapper.isHealthy = false;
       return true;
     }

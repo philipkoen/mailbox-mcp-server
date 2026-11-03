@@ -759,7 +759,7 @@ describe("EmailService", () => {
     it("should properly clean up fetch iterator when returning early", async () => {
       (mockCache.get as Mock).mockReturnValue(null);
 
-      let iteratorClosed = false;
+      let _iteratorClosed = false;
       const mockIterator = {
         async *[Symbol.asyncIterator]() {
           try {
@@ -776,11 +776,11 @@ describe("EmailService", () => {
               source: Buffer.from("content"),
             };
           } finally {
-            iteratorClosed = true;
+            _iteratorClosed = true;
           }
         },
         return: vi.fn(async () => {
-          iteratorClosed = true;
+          _iteratorClosed = true;
           return { done: true, value: undefined };
         }),
       };
