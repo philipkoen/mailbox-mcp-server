@@ -9,6 +9,7 @@ interface ImapSearchCriteria {
   to?: string;
   subject?: string;
   body?: string;
+  text?: string;
   or?: Array<{ [key: string]: string | Date }>;
 }
 
@@ -43,6 +44,12 @@ import type {
   ImapConnection,
 } from "../types/email.types.js";
 import { withCacheFallback } from "../utils/cacheFallback.js";
+import {
+  type HeaderField,
+  type HeaderSummary,
+  parseHeaders,
+  summarizeHeaders,
+} from "../utils/headers.js";
 import {
   ImapConnectionPool,
   type ImapConnectionWrapper,
@@ -146,6 +153,176 @@ export class EmailService {
         await this.pool.releaseFromFolder(wrapper);
       }
     }
+  }
+
+  /**
+   * Raw RFC 822 source of a message (headers + body), or null if not found.
+   * Not cached: used for header analysis and Sieve dry runs.
+   */
+  async getRawEmail(uid: number, folder = "INBOX"): Promise<Buffer | null> {
+    let wrapper: ImapConnectionWrapper | null = null;
+    try {
+      wrapper = await this.pool.acquireForFolder(folder);
+      const message = (await this.fetchRawMessageByUid(wrapper, uid, folder)) as
+        | (ImapMessage & { source?: Buffer })
+        | null;
+      return message?.source ?? null;
+    } finally {
+      if (wrapper) {
+        await this.pool.releaseFromFolder(wrapper);
+      }
+    }
+  }
+
+  /**
+   * All header fields of a message plus a summary of the fields relevant
+   * for spam/filter analysis (Reply-To, List-Unsubscribe, Received chain,
+   * Authentication-Results, X-Spam-*).
+   */
+  async getEmailHeaders(
+    uid: number,
+    folder = "INBOX",
+    names?: string[],
+  ): Promise<{
+    uid: number;
+    folder: string;
+    headers: HeaderField[];
+    summary: HeaderSummary;
+  } | null> {
+    const raw = await this.getRawEmail(uid, folder);
+    if (!raw) {
+      return null;
+    }
+    const all = parseHeaders(raw);
+    const wanted = names?.map(n => n.toLowerCase());
+    return {
+      uid,
+      folder,
+      headers: wanted
+        ? all.filter(h => wanted.includes(h.name.toLowerCase()))
+        : all,
+      summary: summarizeHeaders(all),
+    };
+  }
+
+  /**
+   * UIDs of messages in a folder, newest first, optionally limited by date.
+   */
+  async listMessageUids(
+    folder: string,
+    options: { since?: Date; before?: Date; limit?: number } = {},
+  ): Promise<number[]> {
+    let wrapper: ImapConnectionWrapper | null = null;
+    try {
+      wrapper = await this.pool.acquireForFolder(folder);
+      const criteria: ImapSearchCriteria = {};
+      if (options.since) criteria.since = options.since;
+      if (options.before) criteria.before = options.before;
+      const result = await wrapper.connection.search(
+        Object.keys(criteria).length ? criteria : { all: true },
+        { uid: true },
+      );
+      const uids = Array.isArray(result)
+        ? [...result].sort((a, b) => b - a)
+        : [];
+      return options.limit ? uids.slice(0, options.limit) : uids;
+    } finally {
+      if (wrapper) {
+        await this.pool.releaseFromFolder(wrapper);
+      }
+    }
+  }
+
+  /**
+   * Server-side search across all (or selected) folders. Useful to find
+   * messages that a filter or the spam filter already moved away.
+   */
+  async searchAllFolders(options: {
+    from?: string;
+    to?: string;
+    subject?: string;
+    body?: string;
+    text?: string;
+    since?: Date;
+    before?: Date;
+    folders?: string[];
+    excludeFolders?: string[];
+    limitPerFolder?: number;
+    limit?: number;
+  }): Promise<{
+    messages: EmailMessage[];
+    searchedFolders: string[];
+    failedFolders: Array<{ folder: string; error: string }>;
+    totalMatches: number;
+  }> {
+    const criteria: ImapSearchCriteria = {};
+    for (const key of ["from", "to", "subject", "body", "text"] as const) {
+      if (options[key]) {
+        criteria[key] = options[key];
+      }
+    }
+    if (options.since) criteria.since = options.since;
+    if (options.before) criteria.before = options.before;
+
+    const exclude = new Set(options.excludeFolders ?? []);
+    const folderPaths = options.folders?.length
+      ? options.folders
+      : (await this.getFolders())
+          .filter(
+            f =>
+              !f.flags.some(flag =>
+                ["\\noselect", "\\nonexistent"].includes(flag.toLowerCase()),
+              ),
+          )
+          .map(f => f.path);
+
+    const perFolder = options.limitPerFolder ?? 20;
+    const messages: EmailMessage[] = [];
+    const searchedFolders: string[] = [];
+    const failedFolders: Array<{ folder: string; error: string }> = [];
+    let totalMatches = 0;
+
+    for (const folder of folderPaths) {
+      if (exclude.has(folder)) {
+        continue;
+      }
+      let wrapper: ImapConnectionWrapper | null = null;
+      try {
+        wrapper = await this.pool.acquireForFolder(folder);
+        const result = await wrapper.connection.search(
+          Object.keys(criteria).length ? criteria : { all: true },
+        );
+        searchedFolders.push(folder);
+        const seqs = Array.isArray(result) ? result : [];
+        totalMatches += seqs.length;
+        if (seqs.length) {
+          // Highest sequence numbers are the newest messages
+          const newest = [...seqs].sort((a, b) => b - a).slice(0, perFolder);
+          messages.push(
+            ...(await this.fetchMessageHeaders(wrapper, newest, folder)),
+          );
+        }
+      } catch (error) {
+        failedFolders.push({
+          folder,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        if (wrapper) {
+          await this.pool.releaseFromFolder(wrapper);
+        }
+      }
+    }
+
+    return {
+      messages: this.sortMessagesByDate(messages).slice(
+        0,
+        options.limit ?? 100,
+      ),
+      searchedFolders,
+      failedFolders,
+      totalMatches,
+    };
   }
 
   async getEmailThread(
