@@ -13,15 +13,15 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "bun run tsx watch src/main.ts",
-    "build": "bun run tsc",
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
     "start": "node dist/main.js",
-    "test": "bun run vitest --run",
-    "test:watch": "bun run vitest --watch",
-    "test:coverage": "bun run vitest --coverage",
-    "format": "bun run biome format --write src/ tests/",
-    "lint": "bun run biome lint src/ tests/",
-    "check": "bun run biome check --write src/ tests/"
+    "test": "vitest --run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "format": "biome format --write src/ tests/",
+    "lint": "biome lint src/ tests/",
+    "check": "biome check --write src/ tests/"
   },
   "keywords": [
     "mcp",

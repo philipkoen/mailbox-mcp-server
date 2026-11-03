@@ -56,8 +56,8 @@ A Model Context Protocol (MCP) server that integrates mailbox.org email and cale
    ```bash
    git clone <repository-url>
    cd mailbox-mcp-server
-   bun install
-   bun run build
+   npm install
+   npm run build
    ```
 
 2. Copy the example environment file and update it with your credentials:
@@ -319,10 +319,10 @@ The server implements robust connection pooling for optimal performance and reli
 2. Install dependencies:
 
    ```bash
-   bun install
+   npm install
    ```
 
-   > **Note**: This project uses bun as the package manager. Make sure you have bun installed (version 1.0 or later recommended).
+   > **Note**: Plain npm works; bun is optional (`bun install` / `bun run <script>` behave the same). A `.npmrc` forces devDependencies even if `NODE_ENV=production` is set.
 
 3. Create environment configuration:
 
@@ -339,7 +339,7 @@ The MCP Inspector is a powerful tool for debugging and monitoring your MCP serve
 1. Start the server with inspector enabled:
 
    ```bash
-   MCP_INSPECTOR=true bun start
+   MCP_INSPECTOR=true npm start
    ```
 
 2. Access the web UI at `http://localhost:3000/inspector` (port may vary based on your configuration)
@@ -381,7 +381,7 @@ The MCP Inspector is a powerful tool for debugging and monitoring your MCP serve
 For more detailed debugging information, enable debug mode:
 
 ```bash
-MCP_DEBUG=true MCP_INSPECTOR=true bun start
+MCP_DEBUG=true MCP_INSPECTOR=true npm start
 ```
 
 #### Best Practices
@@ -393,15 +393,15 @@ MCP_DEBUG=true MCP_INSPECTOR=true bun start
 
 ### **Available Scripts**
 
-- **`bun dev`** - Start development server with hot reloading
-- **`bun run build`** - Build for production
-- **`bun start`** - Start production server
-- **`bun run test`** - Run test suite
-- **`bun run test:unit`** - Run unit tests only
-- **`bun run test:integration`** - Run integration tests only
-- **`bun format`** - Format code with Biome
-- **`bun lint`** - Lint code with Biome
-- **`bun check`** - Run both linting and formatting
+- **`npm run dev`** - Start development server with hot reloading
+- **`npm run build`** - Build for production
+- **`npm start`** - Start production server
+- **`npm test`** - Run test suite
+- **`npm run test:watch`** - Run tests in watch mode
+- **`npm run test:coverage`** - Run tests with coverage
+- **`npm run format`** - Format code with Biome
+- **`npm run lint`** - Lint code with Biome
+- **`npm run check`** - Run both linting and formatting
 
 ### **Testing**
 
@@ -413,13 +413,13 @@ The project includes comprehensive test coverage:
 
 ```bash
 # Run all tests
-bun run test
+npm test
 
 # Run with coverage
-bun run test:coverage
+npm run test:coverage
 
 # Test specific service
-bun run test ImapService
+npm test -- ImapService
 ```
 
 ## Dependencies
@@ -457,7 +457,7 @@ This project relies on the following key dependencies:
 
    ```bash
    # If you encounter module not found errors:
-   bun install
+   npm install
    ```
 
 4. **Debugging**
@@ -465,7 +465,7 @@ This project relies on the following key dependencies:
    - Enable debug mode for more detailed logs:
 
      ```bash
-     DEBUG=true bun start
+     DEBUG=true npm start
      ```
 
    - Check the [Debugging with Inspector](#debugging-with-inspector) section for advanced troubleshooting
