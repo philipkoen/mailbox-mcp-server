@@ -486,7 +486,7 @@ describe("CalendarService event changes", () => {
         it("should refuse to write when MAILBOX_CALENDARS is not set", async () => {
           await expect(
             makeService({ calendars: undefined }).createCalendarEvent(newEvent),
-          ).rejects.toThrow(/requires MAILBOX_CALENDARS/);
+          ).rejects.toThrow(/requires MAILBOX_WRITE_CALENDARS/);
 
           expect(createCalendarObject).not.toHaveBeenCalled();
         });
@@ -503,6 +503,44 @@ describe("CalendarService event changes", () => {
           await makeService({ calendars: ["private"] }).createCalendarEvent(
             newEvent,
           );
+
+          expect(writtenTo()).toBe(PRIVATE_URL);
+        });
+
+        it("should write only to MAILBOX_WRITE_CALENDARS when it is set", async () => {
+          const service = makeService({
+            calendars: undefined,
+            writeCalendars: ["private"],
+          });
+
+          await service.createCalendarEvent(newEvent);
+          expect(writtenTo()).toBe(PRIVATE_URL);
+
+          await expect(
+            service.createCalendarEvent({ ...newEvent, calendar: "work" }),
+          ).rejects.toThrow(/not found/);
+        });
+
+        it("should fall back to MAILBOX_CALENDARS when MAILBOX_WRITE_CALENDARS is blank", async () => {
+          await makeService({
+            calendars: ["private"],
+            writeCalendars: ["", " "],
+          }).createCalendarEvent(newEvent);
+          expect(writtenTo()).toBe(PRIVATE_URL);
+
+          await expect(
+            makeService({
+              calendars: undefined,
+              writeCalendars: ["", " "],
+            }).createCalendarEvent(newEvent),
+          ).rejects.toThrow(/requires MAILBOX_WRITE_CALENDARS/);
+        });
+
+        it("should prefer MAILBOX_WRITE_CALENDARS over MAILBOX_CALENDARS for writes", async () => {
+          await makeService({
+            calendars: ["work", "private"],
+            writeCalendars: ["private"],
+          }).createCalendarEvent(newEvent);
 
           expect(writtenTo()).toBe(PRIVATE_URL);
         });

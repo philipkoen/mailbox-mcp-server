@@ -162,11 +162,11 @@ export class CalendarService {
   async createCalendarEvent(
     options: CreateCalendarEventOptions,
   ): Promise<CreateCalendarEventResult> {
-    // Writes are opt-in per calendar: without an explicit MAILBOX_CALENDARS
-    // allowlist the tool would write into every visible (also shared) calendar.
-    if (!this.allowedCalendars()) {
+    // Writes are opt-in per calendar: without an explicit write allowlist
+    // the tool would write into every visible (also shared) calendar.
+    if (!this.writableCalendars()) {
       throw new ValidationError(
-        "create_calendar_event requires MAILBOX_CALENDARS to list the calendars it may write to",
+        "create_calendar_event requires MAILBOX_WRITE_CALENDARS (or MAILBOX_CALENDARS) to list the calendars it may write to",
         "calendar",
         options.calendar ?? "",
       );
@@ -237,8 +237,8 @@ export class CalendarService {
     calendarFilter?: string,
   ): DAVCalendar {
     if (candidates.length === 0) {
-      const scope = this.allowedCalendars()
-        ? " among the calendars MAILBOX_CALENDARS allows"
+      const scope = this.writableCalendars()
+        ? " among the calendars allowed for writing (MAILBOX_WRITE_CALENDARS / MAILBOX_CALENDARS)"
         : "";
       throw calendarFilter
         ? new ValidationError(
@@ -248,7 +248,7 @@ export class CalendarService {
           )
         : new ValidationError(
             scope
-              ? "No calendar available to create the event in; check MAILBOX_CALENDARS"
+              ? "No calendar available to create the event in; check MAILBOX_WRITE_CALENDARS / MAILBOX_CALENDARS"
               : "No calendar that can hold events was found",
             "calendar",
           );
@@ -273,7 +273,7 @@ export class CalendarService {
     // Without a filter the default is the first MAILBOX_CALENDARS entry. If
     // that entry matches several calendars (e.g. an own and a shared one with
     // the same display name), refuse instead of letting server order decide.
-    const firstEntry = this.allowedCalendars()?.find(name =>
+    const firstEntry = this.writableCalendars()?.find(name =>
       this.calendarMatches(candidates[0], name),
     );
     if (firstEntry) {
@@ -304,7 +304,7 @@ export class CalendarService {
     calendarFilter?: string,
   ): Promise<DAVCalendar[]> {
     const calendars = await client.fetchCalendars();
-    const allowed = this.allowedCalendars();
+    const allowed = this.writableCalendars();
     const rank = (calendar: DAVCalendar): number =>
       allowed
         ? allowed.findIndex(name => this.calendarMatches(calendar, name))
@@ -320,7 +320,18 @@ export class CalendarService {
       .sort((a, b) => rank(a) - rank(b));
   }
 
-  /** The MAILBOX_CALENDARS names, or undefined when it restricts nothing. */
+  /**
+   * Calendars a write may touch: MAILBOX_WRITE_CALENDARS when set, otherwise
+   * MAILBOX_CALENDARS. Undefined means no write allowlist (writes refused).
+   */
+  private writableCalendars(): string[] | undefined {
+    const names = this.connection.writeCalendars
+      ?.map(name => name.trim())
+      .filter(name => name.length > 0);
+    return names?.length ? names : this.allowedCalendars();
+  }
+
+  /** The MAILBOX_CALENDARS names (read scope), or undefined when unrestricted. */
   private allowedCalendars(): string[] | undefined {
     const names = this.connection.calendars
       ?.map(name => name.trim())

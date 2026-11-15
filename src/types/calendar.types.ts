@@ -56,6 +56,8 @@ export interface CalDavConnection {
   username: string;
   password: string;
   calendars?: string[];
+  /** Calendars create_calendar_event may write to (defaults to `calendars`). */
+  writeCalendars?: string[];
   /** Allow attendees on created events (may trigger server-sent invitations). */
   allowAttendees?: boolean;
 }

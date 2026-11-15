@@ -138,7 +138,7 @@ A Model Context Protocol (MCP) server that integrates mailbox.org email and cale
 - **`get_calendar_events`** - Retrieve events in date range
 - **`search_calendar`** - Search events by keyword
 - **`get_free_busy`** - Check availability for scheduling
-- **`create_calendar_event`** - Create an event (summary, start/end, optional description, location, all-day flag, attendees, target calendar) and return its UID. Timed events are stored in UTC; all-day events as dates with an exclusive end (an end on the start date makes a one-day event). Requires `MAILBOX_CALENDARS`: events can only be created in the calendars listed there (exact display name, URL or last URL path segment), and the first one listed is the default. Attendees are refused unless `MAILBOX_CALENDAR_ALLOW_ATTENDEES=true`, because mailbox.org may send them invitations from your account
+- **`create_calendar_event`** - Create an event (summary, start/end, optional description, location, all-day flag, attendees, target calendar) and return its UID. Timed events are stored in UTC; all-day events as dates with an exclusive end (an end on the start date makes a one-day event). Requires `MAILBOX_WRITE_CALENDARS` (falls back to `MAILBOX_CALENDARS`): events can only be created in the calendars listed there (exact display name, URL or last URL path segment), and the first one listed is the default. Attendees are refused unless `MAILBOX_CALENDAR_ALLOW_ATTENDEES=true`, because mailbox.org may send them invitations from your account
 
 ### **Sieve Filter Tools**
 
@@ -235,7 +235,8 @@ Configuration is automatically validated at startup using comprehensive validati
 
 - `MAILBOX_CALDAV_URL`: CalDAV server URL (default: `https://dav.mailbox.org/`)
   - Must be a valid URL format
-- `MAILBOX_CALENDARS`: Comma-separated list of calendars to access. Also limits where `create_calendar_event` may write; the first entry is its default calendar. Without it, `create_calendar_event` refuses to write
+- `MAILBOX_CALENDARS`: Comma-separated list of calendars to access. Unless `MAILBOX_WRITE_CALENDARS` is set, also limits where `create_calendar_event` may write; the first entry is its default calendar. Without it (and without `MAILBOX_WRITE_CALENDARS`), `create_calendar_event` refuses to write
+- `MAILBOX_WRITE_CALENDARS`: Comma-separated list of calendars `create_calendar_event` may write to; the first entry is the default. Overrides `MAILBOX_CALENDARS` for writes only, so reading can cover all calendars while writing stays limited. An empty value falls back to `MAILBOX_CALENDARS`
 - `MAILBOX_CALENDAR_ALLOW_ATTENDEES`: Set to `true` to let `create_calendar_event` add attendees (default: off, attendees are refused)
 
 #### **Optional Sieve Configuration**

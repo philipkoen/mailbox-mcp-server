@@ -148,7 +148,7 @@ export function createCalendarTools(_calendarService: CalendarService): Tool[] {
     {
       name: "create_calendar_event",
       description:
-        "Create an event in a mailbox.org calendar listed in MAILBOX_CALENDARS. Attendees are only accepted when MAILBOX_CALENDAR_ALLOW_ATTENDEES=true, because the server may send them invitations. Calling twice creates two events. Returns the new event's UID.",
+        "Create an event in a mailbox.org calendar listed in MAILBOX_WRITE_CALENDARS (or MAILBOX_CALENDARS if that is not set). Attendees are only accepted when MAILBOX_CALENDAR_ALLOW_ATTENDEES=true, because the server may send them invitations. Calling twice creates two events. Returns the new event's UID.",
       annotations: {
         title: "Create calendar event",
         readOnlyHint: false,
