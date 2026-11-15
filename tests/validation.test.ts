@@ -99,6 +99,36 @@ describe("Email validation schemas", () => {
       });
       expect(result.query).toBe("testquery");
     });
+
+    it("should validate boolean flag filters", () => {
+      const result = validateInput(searchEmailsSchema, {
+        seen: false,
+        answered: true,
+        flagged: true,
+        draft: false,
+        deleted: false,
+      });
+      expect(result.seen).toBe(false);
+      expect(result.answered).toBe(true);
+      expect(result.flagged).toBe(true);
+      expect(result.draft).toBe(false);
+      expect(result.deleted).toBe(false);
+    });
+
+    it("should leave flag filters undefined when not provided", () => {
+      const result = validateInput(searchEmailsSchema, {});
+      expect(result.seen).toBeUndefined();
+      expect(result.answered).toBeUndefined();
+      expect(result.flagged).toBeUndefined();
+      expect(result.draft).toBeUndefined();
+      expect(result.deleted).toBeUndefined();
+    });
+
+    it("should reject non-boolean flag values", () => {
+      expect(() => {
+        validateInput(searchEmailsSchema, { seen: "true" });
+      }).toThrow("Validation failed");
+    });
   });
 
   describe("getEmailSchema", () => {
@@ -409,14 +439,17 @@ describe("Folder path validation", () => {
     expect(result.folder).toBe("INBOX/Recruiter-Spam");
   });
 
-  it.each(["/INBOX", "INBOX/", "INBOX//Sub", "INBOX/../Spam", "./INBOX"])(
-    "should reject malformed folder path %s",
-    folder => {
-      expect(() => validateInput(getEmailSchema, { uid: 1, folder })).toThrow(
-        "Validation failed",
-      );
-    },
-  );
+  it.each([
+    "/INBOX",
+    "INBOX/",
+    "INBOX//Sub",
+    "INBOX/../Spam",
+    "./INBOX",
+  ])("should reject malformed folder path %s", folder => {
+    expect(() => validateInput(getEmailSchema, { uid: 1, folder })).toThrow(
+      "Validation failed",
+    );
+  });
 });
 
 describe("Folder path sanitizing order", () => {

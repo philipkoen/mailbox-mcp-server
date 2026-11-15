@@ -16,6 +16,11 @@ interface ImapSearchCriteria {
   body?: string;
   text?: string;
   or?: Array<{ [key: string]: string | Date }>;
+  seen?: boolean;
+  answered?: boolean;
+  flagged?: boolean;
+  draft?: boolean;
+  deleted?: boolean;
 }
 
 interface ImapMessage {
@@ -28,7 +33,8 @@ interface ImapMessage {
     date?: Date;
   };
   uid: number;
-  flags: string[];
+  /** imapflow returns a Set; arrays are accepted for robustness */
+  flags?: Set<string> | string[];
   bodystructure?: unknown;
   size?: number;
 }
@@ -131,32 +137,17 @@ export class EmailService {
           const message = await this.fetchEmailByUid(wrapper, uid, folder);
           return message;
         },
-        defaultValue: null,
+        // No defaultValue: when the connection fails and there is no stale
+        // copy, the error must surface instead of reading as "not found".
         logger: this.logger,
         operation: "getEmail",
         service: "EmailService",
         ttl: 600000, // 10 minutes TTL
         logContext: { uid, folder },
       });
-    } catch (error) {
-      // Mark connection as unhealthy if fetch operation timed out
-      if (
-        wrapper &&
-        error instanceof Error &&
-        error.message.includes("timed out")
-      ) {
-        (wrapper as ImapConnectionWrapper).isHealthy = false;
-        await this.logger.warning(
-          "Marking connection as unhealthy due to timeout",
-          {
-            operation: "getEmail",
-            service: "EmailService",
-          },
-          { uid, folder },
-        );
-      }
-      throw error;
     } finally {
+      // A timed-out or failed fetch has already marked the connection
+      // unhealthy (fetchRawMessageByUid), so releasing it retires it.
       if (wrapper) {
         await this.pool.releaseFromFolder(wrapper);
       }
@@ -217,9 +208,17 @@ export class EmailService {
       if (meta.size > maxBytes) {
         return { status: "too_large", size: meta.size };
       }
-      const message = (await this.fetchRawMessageByUid(wrapper, uid, folder)) as
-        | (ImapMessage & { source?: Buffer })
-        | null;
+      let message: (ImapMessage & { source?: Buffer }) | null;
+      try {
+        message = (await this.fetchRawMessageByUid(wrapper, uid, folder)) as
+          | (ImapMessage & { source?: Buffer })
+          | null;
+      } catch {
+        // fetchRawMessageByUid throws on timeout/server errors (it no longer
+        // returns null for those); a dry run skips the message instead of
+        // aborting the whole run. The connection is already marked unhealthy.
+        return { status: "failed" };
+      }
       return message?.source
         ? { status: "ok", source: message.source }
         : { status: "failed" };
@@ -548,7 +547,7 @@ export class EmailService {
     const fetchPromise = this.performFetch(wrapper, uid);
 
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeoutPromise = new Promise<null>((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         reject(
           new Error(`IMAP fetch operation timed out after ${timeoutMs}ms`),
@@ -576,7 +575,9 @@ export class EmailService {
       // IMAP connection in a corrupted state. Marking it unhealthy ensures
       // it won't be reused and will be destroyed on next validation.
       wrapper.isHealthy = false;
-      return null;
+      // Rethrown rather than returning null, which callers read as "no such
+      // message". Only fetchOne resolving without a message means not found.
+      throw error;
     } finally {
       clearTimeout(timer);
     }
@@ -586,9 +587,11 @@ export class EmailService {
     wrapper: ImapConnectionWrapper,
     uid: number,
   ): Promise<ImapMessage | null> {
-    // Create iterator explicitly so we can properly close it
-    const iterator = wrapper.connection.fetch(
-      `${uid}:${uid}`,
+    // fetchOne issues the FETCH and resolves once the command has completed.
+    // Avoid returning early from a fetch() async iterator: on imapflow 1.x that
+    // left the command pending and blocked the connection (issue #8).
+    const message = await wrapper.connection.fetchOne(
+      uid,
       {
         source: true,
         envelope: true,
@@ -598,37 +601,7 @@ export class EmailService {
       { uid: true },
     );
 
-    try {
-      // Get the first (and should be only) message
-      for await (const msg of iterator) {
-        return msg as unknown as ImapMessage;
-      }
-      return null;
-    } finally {
-      // Explicitly close the iterator to prevent connection state issues
-      // This is critical for connection reuse - without this, the connection
-      // may be left in a state where it's waiting for the iterator to complete
-      try {
-        if (iterator && typeof iterator.return === "function") {
-          await iterator.return();
-        }
-      } catch (error) {
-        // If iterator cleanup fails, mark the connection as unhealthy
-        // to prevent reuse of a potentially corrupted connection
-        await this.logger.warning(
-          "Failed to properly close fetch iterator",
-          {
-            operation: "performFetch",
-            service: "EmailService",
-          },
-          {
-            uid,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        );
-        wrapper.isHealthy = false;
-      }
-    }
+    return message ? (message as unknown as ImapMessage) : null;
   }
 
   private buildSearchCriteria(options: EmailSearchOptions): ImapSearchCriteria {
@@ -636,6 +609,7 @@ export class EmailService {
 
     criteria = this.addDateFilters(criteria, options);
     criteria = this.addQueryFilters(criteria, options);
+    criteria = this.addFlagFilters(criteria, options);
 
     return Object.keys(criteria).length === 0 ? { all: true } : criteria;
   }
@@ -649,6 +623,28 @@ export class EmailService {
     }
     if (options.before) {
       criteria.before = options.before;
+    }
+    return criteria;
+  }
+
+  private addFlagFilters(
+    criteria: ImapSearchCriteria,
+    options: EmailSearchOptions,
+  ): ImapSearchCriteria {
+    if (options.seen !== undefined) {
+      criteria.seen = options.seen;
+    }
+    if (options.answered !== undefined) {
+      criteria.answered = options.answered;
+    }
+    if (options.flagged !== undefined) {
+      criteria.flagged = options.flagged;
+    }
+    if (options.draft !== undefined) {
+      criteria.draft = options.draft;
+    }
+    if (options.deleted !== undefined) {
+      criteria.deleted = options.deleted;
     }
     return criteria;
   }
@@ -802,7 +798,7 @@ export class EmailService {
       to: this.parseAddressesFromEnvelope(envelope.to),
       cc: this.parseAddressesFromEnvelope(envelope.cc),
       date: envelope.date || new Date(),
-      flags: message.flags || [],
+      flags: Array.from(message.flags ?? []),
       folder,
     };
   }
@@ -829,7 +825,7 @@ export class EmailService {
         size: att.size,
         contentId: att.cid,
       })),
-      flags: message.flags || [],
+      flags: Array.from(message.flags ?? []),
       folder,
     };
   }
