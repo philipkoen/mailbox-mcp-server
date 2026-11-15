@@ -48,26 +48,24 @@ describe("Email Tools", () => {
       expect(searchTool?.inputSchema.properties).toHaveProperty("before");
     });
 
-    it.each([
-      "seen",
-      "answered",
-      "flagged",
-      "draft",
-      "deleted",
-    ])("should document %s as an optional boolean with omit = both", name => {
-      const tools = createEmailTools(mockEmailService);
-      const searchTool = tools.find(t => t.name === "search_emails");
-      const prop = (
-        searchTool?.inputSchema.properties as Record<
-          string,
-          { type: string; description: string }
-        >
-      )[name];
+    it.each(["seen", "answered", "flagged", "draft", "deleted"])(
+      "should document %s as an optional boolean with omit = both",
+      name => {
+        const tools = createEmailTools(mockEmailService);
+        const searchTool = tools.find(t => t.name === "search_emails");
+        if (!searchTool) throw new Error("search_emails tool missing");
+        const prop = (
+          searchTool.inputSchema.properties as Record<
+            string,
+            { type: string; description: string }
+          >
+        )[name];
 
-      expect(prop.type).toBe("boolean");
-      expect(prop.description).toContain("omit = both");
-      expect(searchTool?.inputSchema.required ?? []).not.toContain(name);
-    });
+        expect(prop.type).toBe("boolean");
+        expect(prop.description).toContain("omit = both");
+        expect(searchTool?.inputSchema.required ?? []).not.toContain(name);
+      },
+    );
 
     it("should have proper schema for get_email tool", () => {
       const tools = createEmailTools(mockEmailService);

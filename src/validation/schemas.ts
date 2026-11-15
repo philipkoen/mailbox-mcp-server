@@ -338,13 +338,8 @@ export const testSieveScriptSchema = v.object({
       v.maxLength(100),
       v.check(
         name =>
-          [...name].every(
-            ch =>
-              isAllowedSieveNameChar(ch.codePointAt(0) ?? 0) &&
-              ch !== '"' &&
-              ch !== "\\",
-          ),
-        "Script name must not contain control characters, quotes or backslashes",
+          [...name].every(ch => isAllowedSieveNameChar(ch.codePointAt(0) ?? 0)),
+        "Script name must not contain control characters, line separators, BOM or unpaired surrogates",
       ),
     ),
   ),

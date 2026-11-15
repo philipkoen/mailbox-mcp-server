@@ -298,7 +298,10 @@ fileinto "\${unicode:110000}";`,
 });
 
 describe("scriptName validation (ManageSieve injection)", () => {
-  it.each(['x"\r\nDELETESCRIPT "victim', "a\\b", 'q"', "a\u0001b"])(
+  // CR/LF and control characters stay forbidden (protocol injection).
+  // Quotes and backslashes are allowed since upstream #20: SieveService
+  // escapes them in quoteSieveString, same rule as get/put/delete/activate.
+  it.each(['x"\r\nDELETESCRIPT "victim', "a\u0001b", "a\u2028b"])(
     "rejects %j",
     name => {
       expect(() =>
@@ -306,6 +309,12 @@ describe("scriptName validation (ManageSieve injection)", () => {
       ).toThrow("Validation failed");
     },
   );
+
+  it.each(['q"', "a\\b"])("accepts quotes and backslashes %j", name => {
+    expect(
+      validateInput(testSieveScriptSchema, { scriptName: name }).scriptName,
+    ).toBe(name);
+  });
 
   it("accepts normal names", () => {
     expect(
@@ -441,6 +450,7 @@ describe("variable size limits", () => {
     const { parseHeaders } = await import("../src/utils/headers.js");
     const doubling = Array.from(
       { length: 40 },
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: Sieve variable syntax
       () => 'set "a" "${a}${a}";',
     ).join("\n");
     const script = `require ["variables", "fileinto"];\nset "a" "xxxxxxxxxx";\n${doubling}\nif string :matches "\${a}" "*" { fileinto "Done"; }`;

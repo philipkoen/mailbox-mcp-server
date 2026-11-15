@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { ConnectionPoolConfig } from "../src/services/ConnectionPool.js";
 import type {
   SmtpConnectionWrapper,
   SmtpPoolConfig,
@@ -384,17 +383,22 @@ describe("SmtpService", () => {
       ["ETIMEDOUT", undefined, "Connection timeout"],
       ["ECONNECTION", undefined, "Connection closed unexpectedly"],
       ["EDNS", "ENOTFOUND", "getaddrinfo ENOTFOUND smtp.example.com"],
-    ])("should mark the connection unhealthy when sendMail fails with %s (%s)", async (code, originalCode, message) => {
-      mockSendMail.mockRejectedValue(
-        nodemailerError(message, code, originalCode),
-      );
+    ])(
+      "should mark the connection unhealthy when sendMail fails with %s (%s)",
+      async (code, originalCode, message) => {
+        mockSendMail.mockRejectedValue(
+          nodemailerError(message, code, originalCode),
+        );
 
-      const result = await smtpService.sendEmail(createMockEmailComposition());
+        const result = await smtpService.sendEmail(
+          createMockEmailComposition(),
+        );
 
-      expect(result.success).toBe(false);
-      expect(mockWrapper.isHealthy).toBe(false);
-      expect(mockPool.release).toHaveBeenCalledWith(mockWrapper);
-    });
+        expect(result.success).toBe(false);
+        expect(mockWrapper.isHealthy).toBe(false);
+        expect(mockPool.release).toHaveBeenCalledWith(mockWrapper);
+      },
+    );
 
     it("should recognise a raw system errno outside nodemailer's wrapping", async () => {
       mockSendMail.mockRejectedValue(

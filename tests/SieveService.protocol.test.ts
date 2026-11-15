@@ -390,14 +390,14 @@ describe("response size limits", () => {
     expect(sieve.isConnected()).toBe(false);
   });
 
-  it.each([
-    "{4294967296}",
-    "{99999999999999999999}",
-  ])("rejects the 10+ digit literal marker %s", marker => {
-    expect(() =>
-      findResponseEnd(Buffer.from(`${marker}\r\nab\r\nOK\r\nxx\r\n`)),
-    ).toThrow(/too large/);
-  });
+  it.each(["{4294967296}", "{99999999999999999999}"])(
+    "rejects the 10+ digit literal marker %s",
+    marker => {
+      expect(() =>
+        findResponseEnd(Buffer.from(`${marker}\r\nab\r\nOK\r\nxx\r\n`)),
+      ).toThrow(/too large/);
+    },
+  );
 
   it("reads a literal length with leading zeros by value", () => {
     const buf = Buffer.from("{0000000000004}\r\nOK\r\n\r\nOK\r\n");

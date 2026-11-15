@@ -39,11 +39,6 @@ interface ImapMessage {
   size?: number;
 }
 
-interface ImapEnvelopeAddress {
-  name?: string;
-  address: string;
-}
-
 import type { LocalCache } from "../types/cache.types.js";
 import type {
   EmailComposition,
@@ -192,12 +187,23 @@ export class EmailService {
   > {
     let wrapper: ImapConnectionWrapper | null = null;
     try {
-      wrapper = await this.pool.acquireForFolder(folder);
-      const meta = await wrapper.connection.fetchOne(
-        String(uid),
-        { uid: true, size: true },
-        { uid: true },
-      );
+      let meta: Awaited<
+        ReturnType<ImapConnectionWrapper["connection"]["fetchOne"]>
+      >;
+      try {
+        const acquired = await this.pool.acquireForFolder(folder);
+        wrapper = acquired;
+        meta = await acquired.connection.fetchOne(
+          String(uid),
+          { uid: true, size: true },
+          { uid: true },
+        );
+      } catch {
+        // Connection or size-probe failure: report it per message so a dry
+        // run skips this UID instead of aborting the whole run.
+        if (wrapper) wrapper.isHealthy = false;
+        return { status: "failed" };
+      }
       if (!meta) {
         return { status: "not_found" };
       }

@@ -162,6 +162,24 @@ export class CalendarService {
   async createCalendarEvent(
     options: CreateCalendarEventOptions,
   ): Promise<CreateCalendarEventResult> {
+    // Writes are opt-in per calendar: without an explicit MAILBOX_CALENDARS
+    // allowlist the tool would write into every visible (also shared) calendar.
+    if (!this.allowedCalendars()) {
+      throw new ValidationError(
+        "create_calendar_event requires MAILBOX_CALENDARS to list the calendars it may write to",
+        "calendar",
+        options.calendar ?? "",
+      );
+    }
+    // Attendees can make the server send iMIP invitations from this account,
+    // a second, hidden mail-sending path. Off unless explicitly enabled.
+    if (options.attendees?.length && !this.connection.allowAttendees) {
+      throw new ValidationError(
+        "Attendees are disabled; set MAILBOX_CALENDAR_ALLOW_ATTENDEES=true to allow invitations",
+        "attendees",
+        String(options.attendees.length),
+      );
+    }
     const uid = randomUUID();
     const allDay = options.allDay ?? false;
     const dates = allDay ? this.allDayDates(options) : undefined;
@@ -252,6 +270,27 @@ export class CalendarService {
       );
     }
 
+    // Without a filter the default is the first MAILBOX_CALENDARS entry. If
+    // that entry matches several calendars (e.g. an own and a shared one with
+    // the same display name), refuse instead of letting server order decide.
+    const firstEntry = this.allowedCalendars()?.find(name =>
+      this.calendarMatches(candidates[0], name),
+    );
+    if (firstEntry) {
+      const tied = candidates.filter(calendar =>
+        this.calendarMatches(calendar, firstEntry),
+      );
+      if (tied.length > 1) {
+        throw new ValidationError(
+          `Default calendar "${firstEntry}" matches several calendars (${tied
+            .map(calendarLabel)
+            .join(", ")}); name the calendar explicitly`,
+          "calendar",
+          firstEntry,
+        );
+      }
+    }
+
     return candidates[0];
   }
 
@@ -290,8 +329,17 @@ export class CalendarService {
   }
 
   private calendarMatches(calendar: DAVCalendar, name: string): boolean {
+    // Exact matches only: a substring test against the full URL would let an
+    // entry such as "dav" or "/" unlock every calendar.
+    const strip = (value: string): string => value.replace(/\/+$/, "");
     const wanted = name.trim();
-    return calendar.displayName === wanted || calendar.url.includes(wanted);
+    if (!strip(wanted)) return false;
+    const lastSegment = strip(calendar.url).split("/").pop() ?? "";
+    return (
+      calendar.displayName === wanted ||
+      strip(calendar.url) === strip(wanted) ||
+      lastSegment === strip(wanted)
+    );
   }
 
   /** A collection that only takes tasks or journals cannot store a VEVENT. */
@@ -478,12 +526,12 @@ export class CalendarService {
     options: CalendarSearchOptions,
   ): Promise<CalendarEvent[]> {
     try {
-      const calendars =
-        this.connection.calendars || (await this.discoverCalendars());
+      const allowed = this.allowedCalendars();
+      const calendars = allowed || (await this.discoverCalendars());
       const allEvents: CalendarEvent[] = [];
 
       for (const calendar of calendars) {
-        if (options.calendar && calendar !== options.calendar) {
+        if (options.calendar && calendar !== options.calendar.trim()) {
           continue;
         }
 
@@ -544,9 +592,9 @@ export class CalendarService {
           const client = await this.getClient();
           const calendars = await client.fetchCalendars();
 
-          const targetCalendar = calendars.find(
-            (cal: DAVCalendar) =>
-              cal.displayName === calendar || cal.url.includes(calendar),
+          // Same exact matching as the write path (no URL substring test).
+          const targetCalendar = calendars.find((cal: DAVCalendar) =>
+            this.calendarMatches(cal, calendar),
           );
 
           if (!targetCalendar) {

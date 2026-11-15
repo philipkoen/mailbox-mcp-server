@@ -55,7 +55,7 @@
     "imapflow": "^2.0.5",
     "mailparser": "^3.14.3",
     "nodemailer": "^10.5.0",
-    "re2js": "2.8.6",
+    "re2js": "2.10.0",
     "tsdav": "^2.1.6",
     "valibot": "^1.2.0"
   },

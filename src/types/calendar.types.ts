@@ -56,6 +56,8 @@ export interface CalDavConnection {
   username: string;
   password: string;
   calendars?: string[];
+  /** Allow attendees on created events (may trigger server-sent invitations). */
+  allowAttendees?: boolean;
 }
 
 export interface CreateCalendarEventOptions {

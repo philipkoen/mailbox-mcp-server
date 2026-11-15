@@ -98,6 +98,7 @@ const EnvSchema = v.object({
   // Optional CalDAV configuration
   MAILBOX_CALDAV_URL: v.optional(v.pipe(v.string(), v.url())),
   MAILBOX_CALENDARS: v.optional(v.string()),
+  MAILBOX_CALENDAR_ALLOW_ATTENDEES: v.optional(v.string()),
 
   // Optional Sieve configuration
   MAILBOX_SIEVE_HOST: v.optional(v.pipe(v.string(), v.minLength(1))),
@@ -230,6 +231,8 @@ export function loadConfig(): ServerConfig {
         username: email,
         password: password,
         calendars: validatedEnv.MAILBOX_CALENDARS?.split(",") || undefined,
+        allowAttendees:
+          validatedEnv.MAILBOX_CALENDAR_ALLOW_ATTENDEES === "true",
       },
       sieve: {
         host: validatedEnv.MAILBOX_SIEVE_HOST || "imap.mailbox.org",

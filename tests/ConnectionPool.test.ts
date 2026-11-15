@@ -394,6 +394,28 @@ describe("ConnectionPool", () => {
       }
     });
 
+    it("should discard an idle connection a caller marked unhealthy instead of reviving it", async () => {
+      const checkPool = new TestConnectionPool({
+        ...config,
+        healthCheckIntervalMs: 60_000,
+      });
+      try {
+        const wrapper = await checkPool.acquire();
+        wrapper.isHealthy = false;
+        await checkPool.release(wrapper);
+        const validate = vi.spyOn(checkPool, "validateConnection");
+
+        await (
+          checkPool as TestableConnectionPool<MockConnection>
+        ).performHealthCheck();
+
+        expect(validate).not.toHaveBeenCalledWith(wrapper.connection);
+        expect(checkPool.getConnections().has(wrapper.id)).toBe(false);
+      } finally {
+        await checkPool.destroy();
+      }
+    });
+
     it("should validate idle connections by default", async () => {
       const checkPool = new TestConnectionPool({
         ...config,

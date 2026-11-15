@@ -564,10 +564,37 @@ export abstract class ConnectionPool<T> {
     }
   }
 
+  private healthCheckRunning = false;
+
   private startHealthCheck(): void {
+    // Guarded against overlap (a run can outlast the interval) and against
+    // unhandled rejections, which would otherwise end the process.
     this.healthCheckInterval = setInterval(async () => {
-      await this.performHealthCheck();
+      if (this.healthCheckRunning) {
+        return;
+      }
+      this.healthCheckRunning = true;
+      try {
+        await this.performHealthCheck();
+      } catch (error) {
+        // Retried on the next tick; logged so a persistently failing check
+        // does not go unnoticed.
+        const message = error instanceof Error ? error.message : String(error);
+        this.recordError(message, "healthCheck");
+        try {
+          await this.logger.warning(
+            "Connection pool health check failed",
+            { operation: "healthCheck", service: "ConnectionPool" },
+            { error: message },
+          );
+        } catch {
+          // Logging must never break the interval.
+        }
+      } finally {
+        this.healthCheckRunning = false;
+      }
     }, this.config.healthCheckIntervalMs);
+    this.healthCheckInterval.unref?.();
   }
 
   private async performHealthCheck(): Promise<void> {
@@ -617,6 +644,12 @@ export abstract class ConnectionPool<T> {
     now: Date,
     idleTimeout: number,
   ): Promise<boolean> {
+    // A caller marked it unhealthy on purpose (e.g. after a fetch timeout);
+    // a passing NOOP must not resurrect a possibly corrupted session.
+    if (!wrapper.isHealthy) {
+      return true;
+    }
+
     const idleTime = now.getTime() - wrapper.lastUsed.getTime();
 
     // Check if connection has been idle too long

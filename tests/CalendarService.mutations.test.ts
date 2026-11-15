@@ -50,6 +50,9 @@ describe("CalendarService event changes", () => {
         baseUrl: "https://dav.mailbox.org/caldav",
         username: "me@mailbox.org",
         password: "secret",
+        // Writes need an explicit allowlist; attendees need an explicit opt-in.
+        calendars: ["work", "private"],
+        allowAttendees: true,
         ...connection,
       },
       cache,
@@ -373,8 +376,8 @@ describe("CalendarService event changes", () => {
         ]);
 
         await expect(
-          makeService().createCalendarEvent(newEvent),
-        ).rejects.toThrow(/No calendar that can hold events/);
+          makeService({ calendars: ["tasks"] }).createCalendarEvent(newEvent),
+        ).rejects.toThrow(/No calendar available/);
         expect(createCalendarObject).not.toHaveBeenCalled();
       });
 
@@ -399,13 +402,13 @@ describe("CalendarService event changes", () => {
         expect(createCalendarObject).not.toHaveBeenCalled();
       });
 
-      it("should refuse a name that matches several calendars", async () => {
+      it("should not treat a URL substring as a calendar name", async () => {
         await expect(
           makeService().createCalendarEvent({
             ...newEvent,
             calendar: "caldav",
           }),
-        ).rejects.toThrow(/matches several calendars/);
+        ).rejects.toThrow(/not found/);
 
         expect(createCalendarObject).not.toHaveBeenCalled();
       });
@@ -480,6 +483,47 @@ describe("CalendarService event changes", () => {
           expect(createCalendarObject).not.toHaveBeenCalled();
         });
 
+        it("should refuse to write when MAILBOX_CALENDARS is not set", async () => {
+          await expect(
+            makeService({ calendars: undefined }).createCalendarEvent(newEvent),
+          ).rejects.toThrow(/requires MAILBOX_CALENDARS/);
+
+          expect(createCalendarObject).not.toHaveBeenCalled();
+        });
+
+        it("should not let a generic entry such as 'dav' unlock calendars", async () => {
+          await expect(
+            makeService({ calendars: ["dav"] }).createCalendarEvent(newEvent),
+          ).rejects.toThrow(/MAILBOX_CALENDARS/);
+
+          expect(createCalendarObject).not.toHaveBeenCalled();
+        });
+
+        it("should match an entry against the URL's last path segment", async () => {
+          await makeService({ calendars: ["private"] }).createCalendarEvent(
+            newEvent,
+          );
+
+          expect(writtenTo()).toBe(PRIVATE_URL);
+        });
+
+        it("should refuse a default that matches several calendars", async () => {
+          fetchCalendars.mockResolvedValue([
+            ...calendars,
+            {
+              displayName: "work",
+              url: "https://dav.mailbox.org/caldav/shared-by-colleague/",
+              components: ["VEVENT"],
+            },
+          ]);
+
+          await expect(
+            makeService({ calendars: ["work"] }).createCalendarEvent(newEvent),
+          ).rejects.toThrow(/matches several calendars/);
+
+          expect(createCalendarObject).not.toHaveBeenCalled();
+        });
+
         it("should not write when MAILBOX_CALENDARS matches no calendar", async () => {
           await expect(
             makeService({ calendars: ["holidays"] }).createCalendarEvent(
@@ -489,6 +533,17 @@ describe("CalendarService event changes", () => {
 
           expect(createCalendarObject).not.toHaveBeenCalled();
         });
+      });
+
+      it("should refuse attendees unless MAILBOX_CALENDAR_ALLOW_ATTENDEES is set", async () => {
+        await expect(
+          makeService({ allowAttendees: false }).createCalendarEvent({
+            ...newEvent,
+            attendees: [{ email: "someone@example.com" }],
+          }),
+        ).rejects.toThrow(/Attendees are disabled/);
+
+        expect(createCalendarObject).not.toHaveBeenCalled();
       });
 
       it("should not count a wrong calendar name as a server failure", async () => {
