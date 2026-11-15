@@ -141,4 +141,34 @@ describe("Configuration", () => {
       expect(() => loadConfig()).toThrow("Configuration validation failed:");
     });
   });
+
+  describe("MAILBOX_CALDAV_PASSWORD", () => {
+    const base = () => {
+      process.env.MAILBOX_EMAIL = "test@mailbox.org";
+      process.env.MAILBOX_PASSWORD = "TestPass123!";
+    };
+
+    afterEach(() => {
+      delete process.env.MAILBOX_CALDAV_PASSWORD;
+    });
+
+    it("should use MAILBOX_CALDAV_PASSWORD for CalDAV only", () => {
+      base();
+      process.env.MAILBOX_CALDAV_PASSWORD = "DavPass456!";
+      const config = loadConfig();
+      expect(config.calendar.password).toBe("DavPass456!");
+      expect(config.email.password).toBe("TestPass123!");
+      expect(config.smtp.password).toBe("TestPass123!");
+    });
+
+    it.each([undefined, "", "   "])(
+      "should fall back to MAILBOX_PASSWORD when it is %j",
+      value => {
+        base();
+        if (value === undefined) delete process.env.MAILBOX_CALDAV_PASSWORD;
+        else process.env.MAILBOX_CALDAV_PASSWORD = value;
+        expect(loadConfig().calendar.password).toBe("TestPass123!");
+      },
+    );
+  });
 });

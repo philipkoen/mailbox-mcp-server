@@ -236,6 +236,7 @@ Configuration is automatically validated at startup using comprehensive validati
 - `MAILBOX_CALDAV_URL`: CalDAV server URL (default: `https://dav.mailbox.org/`)
   - Must be a valid URL format
 - `MAILBOX_CALENDARS`: Comma-separated list of calendars to access. Unless `MAILBOX_WRITE_CALENDARS` is set, also limits where `create_calendar_event` may write; the first entry is its default calendar. Without it (and without `MAILBOX_WRITE_CALENDARS`), `create_calendar_event` refuses to write
+- `MAILBOX_CALDAV_PASSWORD`: Separate password for CalDAV (calendar). mailbox.org app passwords are scoped per service, so an email app password is rejected by `dav.mailbox.org`; create an application password under Settings → Security → Application passwords. Unset or blank falls back to `MAILBOX_PASSWORD`
 - `MAILBOX_WRITE_CALENDARS`: Comma-separated list of calendars `create_calendar_event` may write to; the first entry is the default. Overrides `MAILBOX_CALENDARS` for writes only, so reading can cover all calendars while writing stays limited. An empty value falls back to `MAILBOX_CALENDARS`
 - `MAILBOX_CALENDAR_ALLOW_ATTENDEES`: Set to `true` to let `create_calendar_event` add attendees (default: off, attendees are refused)
 

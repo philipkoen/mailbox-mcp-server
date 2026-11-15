@@ -69,6 +69,10 @@ const EnvSchema = v.object({
     v.transform(strongPasswordTransform),
   ),
 
+  // Optional separate password for CalDAV. mailbox.org app passwords are
+  // scoped per service: an email app password is rejected by dav.mailbox.org.
+  MAILBOX_CALDAV_PASSWORD: v.optional(v.string()),
+
   // Optional IMAP configuration
   MAILBOX_IMAP_HOST: v.optional(v.pipe(v.string(), v.minLength(1))),
   MAILBOX_IMAP_PORT: v.optional(
@@ -194,6 +198,10 @@ export function loadConfig(): ServerConfig {
     // We've validated these exist and are secure, so they're safe to use
     const email = validatedEnv.MAILBOX_EMAIL;
     const password = validatedEnv.MAILBOX_PASSWORD;
+    // Blank or unset falls back to MAILBOX_PASSWORD (unchanged behaviour).
+    const caldavPassword = validatedEnv.MAILBOX_CALDAV_PASSWORD?.trim()
+      ? validatedEnv.MAILBOX_CALDAV_PASSWORD
+      : password;
 
     // Security recommendations logging (non-sensitive info only)
     if (password.length < 12) {
@@ -230,7 +238,7 @@ export function loadConfig(): ServerConfig {
       calendar: {
         baseUrl: validatedEnv.MAILBOX_CALDAV_URL || "https://dav.mailbox.org/",
         username: email,
-        password: password,
+        password: caldavPassword,
         calendars: validatedEnv.MAILBOX_CALENDARS?.split(",") || undefined,
         writeCalendars:
           validatedEnv.MAILBOX_WRITE_CALENDARS?.split(",") || undefined,
